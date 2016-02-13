@@ -7,48 +7,135 @@
 //
 
 import UIKit
+import MapKit
 
-class BusinessesViewController: UIViewController {
+class BusinessesViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate, MKMapViewDelegate {
 
+    @IBOutlet weak var tableView: UITableView!
+    @IBOutlet weak var map: MKMapView!
+    
     var businesses: [Business]!
+    
+    var searchBar: UISearchBar = UISearchBar()
+    var onShowResultsOnMap: UIBarButtonItem = UIBarButtonItem()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        Business.searchWithTerm("Thai", completion: { (businesses: [Business]!, error: NSError!) -> Void in
-            self.businesses = businesses
         
-            for business in businesses {
-                print(business.name!)
-                print(business.address!)
-            }
-        })
+        map.delegate = self
+        map.hidden = true
+        
+        
+        tableView.delegate = self
+        tableView.dataSource = self
+        tableView.rowHeight = UITableViewAutomaticDimension
+        tableView.estimatedRowHeight = 120
+        
+        searchBar = UISearchBar()
+        searchBar.sizeToFit()
+        searchBar.delegate = self
+        
+        onShowResultsOnMap.image = UIImage(named: "map.png")
+        onShowResultsOnMap.target = self
+        onShowResultsOnMap.action = "showResultsInMap"
+        
+        navigationItem.titleView = searchBar
+        navigationItem.leftBarButtonItem = onShowResultsOnMap
+        
+        let enclosure: CLLocationDistance = 2500
+        let centerLocation = CLLocationCoordinate2D(latitude: 37.785771, longitude: -122.406165)
+        let coordinateRegion = MKCoordinateRegionMakeWithDistance(centerLocation, enclosure, enclosure)
+        map.setRegion(coordinateRegion,animated: true)
+        map.setCenterCoordinate(centerLocation, animated: true)
 
-/* Example of Yelp search with more search options specified
-        Business.searchWithTerm("Restaurants", sort: .Distance, categories: ["asianfusion", "burgers"], deals: true) { (businesses: [Business]!, error: NSError!) -> Void in
+        Business.searchWithTerm("Food", completion: { (businesses: [Business]!, error: NSError!) -> Void in
             self.businesses = businesses
-            
-            for business in businesses {
-                print(business.name!)
-                print(business.address!)
-            }
+            self.tableView.reloadData()
+            self.loadMap()
+        })
+    }
+    
+    func loadMap() {
+        map.removeAnnotations(map.annotations)
+        for b in businesses {
+            let location = CLLocationCoordinate2D(latitude: b.lat, longitude: b.long)
+            let annotation = MKPointAnnotation()
+            annotation.coordinate = location
+            annotation.title = b.name
+            self.map.addAnnotation(annotation)
         }
-*/
+
+    }
+    
+    func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if businesses != nil {
+            return businesses!.count
+        }
+        else {
+            return 0
+        }
+    }
+    
+    func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCellWithIdentifier("BusinessCell", forIndexPath: indexPath) as! BusinessCell
+        
+        cell.business = businesses[indexPath.row]
+        
+        return cell
+    }
+    
+    func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
+        tableView.deselectRowAtIndexPath(indexPath, animated: true)
+    }
+    
+    
+    
+    
+    func search(query: String) {
+        Business.searchWithTerm(query, completion: { (businesses: [Business]!, error: NSError!) -> Void in
+            self.businesses = businesses
+            self.tableView.reloadData()
+            self.loadMap()
+        })
+    }
+    
+    func searchBarSearchButtonClicked(searchBar: UISearchBar) {
+        search(searchBar.text!) //safe to force unwrap because search will be disabled unless there's some text
+        searchBar.showsCancelButton = false
+        searchBar.resignFirstResponder()
+    }
+    
+    func searchBarCancelButtonClicked(searchBar: UISearchBar) {
+        searchBar.showsCancelButton = false
+        searchBar.text = ""
+        searchBar.resignFirstResponder()
+    }
+    
+    func searchBarTextDidBeginEditing(searchBar: UISearchBar) {
+        searchBar.showsCancelButton = true
+    }
+    
+    func showResultsInMap() {
+        map.hidden = !map.hidden
+        tableView.hidden = !tableView.hidden
+        
+        if tableView.hidden {
+            onShowResultsOnMap.image = UIImage(named: "list.png")
+        }
+        else {
+            onShowResultsOnMap.image = UIImage(named: "map.png")
+        }
     }
 
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
 
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
+        if segue.identifier == "ShowDetails" {
+            let cell = sender as! UITableViewCell
+            let indexPath = tableView.indexPathForCell(cell)
+            let business = businesses![indexPath!.row]
+            let detailVC = segue.destinationViewController as! BusinessDetailViewController
+            detailVC.business = business
+        }
     }
-    */
 
 }
